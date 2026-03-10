@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AxiosError } from "axios";
 import api from "@/lib/api";
 
 interface RegisterResponse {
@@ -10,6 +11,10 @@ interface RegisterResponse {
   email: string;
   fullName: string;
   role: "Customer" | "Admin";
+}
+
+interface ErrorMessageDto {
+  message?: string;
 }
 
 export default function RegisterPage() {
@@ -29,8 +34,13 @@ export default function RegisterPage() {
     try {
       await api.post<RegisterResponse>("/auth/register", { firstName, lastName, email, password });
       router.push("/login");
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? "Inregistrarea a esuat.");
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        const responseData = error.response?.data as ErrorMessageDto | undefined;
+        setError(responseData?.message ?? "Inregistrarea a esuat.");
+      } else {
+        setError("Inregistrarea a esuat.");
+      }
     } finally {
       setLoading(false);
     }

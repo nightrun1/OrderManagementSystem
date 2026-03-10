@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AxiosError } from "axios";
 import api from "@/lib/api";
 
 type OrderType = "standard" | "express" | "bulk";
@@ -35,6 +36,10 @@ interface CreatedOrderDto {
   orderType: string;
   shippingCost: number;
   items: OrderItemDto[];
+}
+
+interface ErrorMessageDto {
+  message?: string;
 }
 
 const SHIPPING_PREVIEW: Record<OrderType, number> = {
@@ -142,9 +147,13 @@ export default function NewOrderPage() {
       });
 
       setCreatedOrder(response.data);
-    } catch (requestError: any) {
-      const message = requestError.response?.data?.message ?? "Nu s-a putut crea comanda.";
-      setError(message);
+    } catch (requestError: unknown) {
+      if (requestError instanceof AxiosError) {
+        const responseData = requestError.response?.data as ErrorMessageDto | undefined;
+        setError(responseData?.message ?? "Nu s-a putut crea comanda.");
+      } else {
+        setError("Nu s-a putut crea comanda.");
+      }
     } finally {
       setSubmitting(false);
     }

@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AxiosError } from "axios";
 import api from "@/lib/api";
 
 interface ProductDto {
@@ -19,6 +21,10 @@ interface CreateProductRequest {
   category: string;
   price: number;
   stock: number;
+}
+
+interface ErrorMessageDto {
+  message?: string;
 }
 
 const emptyForm: CreateProductRequest = {
@@ -63,8 +69,13 @@ export default function AdminProductsPage() {
       await api.post("/products", form);
       setForm(emptyForm);
       await loadProducts();
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? "Crearea produsului a esuat.");
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        const responseData = error.response?.data as ErrorMessageDto | undefined;
+        setError(responseData?.message ?? "Crearea produsului a esuat.");
+      } else {
+        setError("Crearea produsului a esuat.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -75,8 +86,13 @@ export default function AdminProductsPage() {
     try {
       await api.delete(`/products/${id}`);
       await loadProducts();
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? "Stergerea produsului a esuat.");
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        const responseData = error.response?.data as ErrorMessageDto | undefined;
+        setError(responseData?.message ?? "Stergerea produsului a esuat.");
+      } else {
+        setError("Stergerea produsului a esuat.");
+      }
     }
   };
 
@@ -86,7 +102,12 @@ export default function AdminProductsPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Admin Products</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold">Admin Products</h1>
+        <Link href="/admin/statistics" className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+          Statistics
+        </Link>
+      </div>
 
       <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-md p-6 space-y-3">
         <h2 className="text-xl font-semibold">Adauga produs nou</h2>

@@ -1,29 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<{ email: string; fullName: string } | null>(null);
+  const hasToken = typeof window !== "undefined" && Boolean(window.localStorage.getItem("token"));
+  const user = { email: "user@example.com", fullName: "User" };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!hasToken) {
       router.push("/login");
-    } else {
-      // In a real app, you'd decode the JWT or fetch user info
-      setUser({ email: "user@example.com", fullName: "User" });
     }
-  }, [router]);
+  }, [hasToken, router]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     router.push("/login");
   };
 
-  if (!user) return null;
+  if (!hasToken) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
@@ -51,7 +48,7 @@ export default function DashboardPage() {
         {/* Welcome Section */}
         <div className="mb-12">
           <h2 className="text-4xl font-bold text-slate-900 mb-4">Welcome back, {user.fullName}!</h2>
-          <p className="text-xl text-slate-600">Here's what's happening with your orders today.</p>
+          <p className="text-xl text-slate-600">Here is what is happening with your orders today.</p>
         </div>
 
         {/* Stats Grid */}

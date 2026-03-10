@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AxiosError } from "axios";
 import api from "@/lib/api";
 
 interface AuthResponse {
@@ -10,6 +11,10 @@ interface AuthResponse {
   email: string;
   fullName: string;
   role: "Customer" | "Admin";
+}
+
+interface ErrorMessageDto {
+  message?: string;
 }
 
 export default function LoginPage() {
@@ -28,8 +33,13 @@ export default function LoginPage() {
       const response = await api.post<AuthResponse>("/auth/login", { email, password });
       window.localStorage.setItem("token", response.data.token);
       router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? "Nu s-a putut realiza autentificarea.");
+    } catch (error: unknown) {
+      if (error instanceof AxiosError) {
+        const responseData = error.response?.data as ErrorMessageDto | undefined;
+        setError(responseData?.message ?? "Nu s-a putut realiza autentificarea.");
+      } else {
+        setError("Nu s-a putut realiza autentificarea.");
+      }
     } finally {
       setLoading(false);
     }
@@ -96,7 +106,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 text-center text-sm text-slate-600">
-            Don't have an account?{" "}
+            Do not have an account?{" "}
             <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700 hover:underline">
               Create one
             </Link>
