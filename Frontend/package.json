@@ -1,0 +1,34 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
+    "dev:backend": "lsof -ti:5248 | xargs kill -15 2>/dev/null || true; cd .. && docker compose up -d sqlserver && cd Backend && dotnet run",
+    "dev:frontend": "lsof -ti:3000 | xargs kill -15 2>/dev/null || true; next dev --port 3000",
+    "db:up": "cd .. && docker compose up -d sqlserver",
+    "db:down": "cd .. && docker compose down",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@types/js-cookie": "^3.0.6",
+    "axios": "^1.13.6",
+    "js-cookie": "^3.0.5",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,19 @@
+Lab1_TO-DO.md
+Lab2_TO-DO.md
+Lab3_TO-DO.md
+Lab4_TO-DO.md
+Lab5_TO-DO.md
+Lab6_TO-DO.md
+Lab7_TO-DO.md
+.github/*
+
+# .NET
+Backend/bin/
+Backend/obj/
+
+# Next.js
+Frontend/node_modules/
+Frontend/.next/
+Frontend/out/
+Frontend/.turbo/
+Frontend/.env*.local

@@ -1,0 +1,127 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using OrderManagementSystem.DTOs.Orders;
+using OrderManagementSystem.Interfaces;
+using OrderManagementSystem.Models;
+
+namespace OrderManagementSystem.Controllers;
+
+[ApiController]
+[Route("api/orders")]
+[Authorize]
+public class OrdersController(
+    IOrderRepository orderRepository,
+    IProductRepository productRepository) : ControllerBase
+{
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<OrderDto>>> GetMyOrders()
+    {
+        var currentUserId = GetCurrentUserId();
+        var orders = await orderRepository.GetByUserIdAsync(currentUserId);
+
+        return Ok(orders.Select(MapToDto).ToList());
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<OrderDto>> GetById(int id)
+    {
+        var order = await orderRepository.GetWithItemsAsync(id);
+        if (order is null)
+        {
+            return NotFound(new { message = "Order was not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        var isAdmin = User.IsInRole(UserRole.Admin.ToString());
+
+        if (!isAdmin && order.UserId != currentUserId)
+        {
+            return StatusCode(403, new { message = "You do not have access to this order." });
+        }
+
+        return Ok(MapToDto(order));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<OrderDto>> Create(CreateOrderRequest request)
+    {
+        if (request.Items.Count == 0)
+        {
+            return BadRequest(new { message = "Order must contain at least one item." });
+        }
+
+        var productMap = new Dictionary<int, Product>();
+        foreach (var item in request.Items)
+        {
+            if (item.Quantity <= 0)
+            {
+                return BadRequest(new { message = $"Invalid quantity for product {item.ProductId}." });
+            }
+
+            var product = await productRepository.GetByIdAsync(item.ProductId);
+            if (product is null || !product.IsActive)
+            {
+                return NotFound(new { message = $"Product {item.ProductId} was not found." });
+            }
+
+            if (product.Stock < item.Quantity)
+            {
+                return BadRequest(new { message = $"Insufficient stock for product {item.ProductId}." });
+            }
+
+            productMap[item.ProductId] = product;
+        }
+
+        decimal totalAmount = 0;
+        var orderItems = new List<OrderItem>();
+
+        foreach (var item in request.Items)
+        {
+            var product = productMap[item.ProductId];
+            totalAmount += product.Price * item.Quantity;
+            orderItems.Add(new OrderItem
+            {
+                ProductId = product.Id,
+                Quantity = item.Quantity,
+                UnitPrice = product.Price
+            });
+
+            product.Stock -= item.Quantity;
+            await productRepository.UpdateAsync(product);
+        }
+
+        var order = new Order
+        {
+            UserId = GetCurrentUserId(),
+            ShippingAddress = request.ShippingAddress.Trim(),
+            Status = OrderStatus.Pending,
+            TotalAmount = totalAmount,
+            Items = orderItems
+        };
+
+        await orderRepository.AddAsync(order);
+
+        var savedOrder = await orderRepository.GetWithItemsAsync(order.Id) ?? order;
+        return Ok(MapToDto(savedOrder));
+    }
+
+    private int GetCurrentUserId()
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(userIdValue, out var userId) ? userId : 0;
+    }
+
+    private static OrderDto MapToDto(Order order)
+    {
+        return new OrderDto(
+            order.Id,
+            order.Status,
+            order.TotalAmount,
+            order.ShippingAddress,
+            order.CreatedAt,
+            order.Items
+                .Select(i => new OrderItemDto(i.ProductId, i.Product.Name, i.Quantity, i.UnitPrice))
+                .ToList());
+    }
+}
