@@ -8,4 +8,6 @@ public record OrderDto(
     decimal TotalAmount,
     string ShippingAddress,
     DateTime CreatedAt,
-    List<OrderItemDto> Items);
+    List<OrderItemDto> Items,
+    string OrderType = "Standard",
+    decimal ShippingCost = 15.00m);

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OrderManagementSystem.DTOs.Orders;
 using OrderManagementSystem.Interfaces;
+using OrderManagementSystem.Lab.Lab2.FactoryMethod;
 using OrderManagementSystem.Models;
 
 namespace OrderManagementSystem.Controllers;
@@ -20,7 +21,7 @@ public class OrdersController(
         var currentUserId = GetCurrentUserId();
         var orders = await orderRepository.GetByUserIdAsync(currentUserId);
 
-        return Ok(orders.Select(MapToDto).ToList());
+        return Ok(orders.Select(order => MapToDto(order)).ToList());
     }
 
     [HttpGet("{id:int}")]
@@ -49,6 +50,16 @@ public class OrdersController(
         if (request.Items.Count == 0)
         {
             return BadRequest(new { message = "Order must contain at least one item." });
+        }
+
+        OrderCreator creator;
+        try
+        {
+            creator = OrderCreatorFactory.GetCreator(request.OrderType);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
 
         var productMap = new Dictionary<int, Product>();
@@ -91,19 +102,29 @@ public class OrdersController(
             await productRepository.UpdateAsync(product);
         }
 
+        OrderCreationResult creationResult;
+        try
+        {
+            creationResult = creator.ProcessOrder(request, GetCurrentUserId(), totalAmount);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+
         var order = new Order
         {
-            UserId = GetCurrentUserId(),
-            ShippingAddress = request.ShippingAddress.Trim(),
-            Status = OrderStatus.Pending,
-            TotalAmount = totalAmount,
+            UserId = creationResult.Order.UserId,
+            ShippingAddress = creationResult.Order.ShippingAddress,
+            Status = creationResult.Order.Status,
+            TotalAmount = creationResult.Order.TotalAmount,
             Items = orderItems
         };
 
         await orderRepository.AddAsync(order);
 
         var savedOrder = await orderRepository.GetWithItemsAsync(order.Id) ?? order;
-        return Ok(MapToDto(savedOrder));
+        return Ok(MapToDto(savedOrder, creationResult.Order.OrderType, creationResult.ShippingCost));
     }
 
     private int GetCurrentUserId()
@@ -112,7 +133,7 @@ public class OrdersController(
         return int.TryParse(userIdValue, out var userId) ? userId : 0;
     }
 
-    private static OrderDto MapToDto(Order order)
+    private static OrderDto MapToDto(Order order, string orderType = "Standard", decimal shippingCost = 15m)
     {
         return new OrderDto(
             order.Id,
@@ -122,6 +143,8 @@ public class OrdersController(
             order.CreatedAt,
             order.Items
                 .Select(i => new OrderItemDto(i.ProductId, i.Product.Name, i.Quantity, i.UnitPrice))
-                .ToList());
+                .ToList(),
+            orderType,
+            shippingCost);
     }
 }

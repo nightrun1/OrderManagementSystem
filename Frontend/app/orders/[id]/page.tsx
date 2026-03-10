@@ -18,6 +18,8 @@ interface OrderDto {
   shippingAddress: string;
   createdAt: string;
   items: OrderItemDto[];
+  orderType?: string;
+  shippingCost?: number;
 }
 
 export default function OrderDetailsPage() {
@@ -51,7 +53,9 @@ export default function OrderDetailsPage() {
       <h1 className="text-3xl font-bold">Comanda #{order.id}</h1>
       <div className="bg-white rounded-xl shadow-md p-6 space-y-2">
         <p><strong>Status:</strong> {order.status}</p>
+        <p><strong>Tip comanda:</strong> {order.orderType ?? "Standard"}</p>
         <p><strong>Total:</strong> {order.totalAmount.toFixed(2)} RON</p>
+        <p><strong>Cost livrare:</strong> {(order.shippingCost ?? 15).toFixed(2)} RON</p>
         <p><strong>Adresa:</strong> {order.shippingAddress}</p>
         <p><strong>Data:</strong> {new Date(order.createdAt).toLocaleString()}</p>
       </div>
