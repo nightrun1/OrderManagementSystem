@@ -8,6 +8,7 @@ using OrderManagementSystem.Interfaces;
 using OrderManagementSystem.Lab.Lab2.AbstractFactory;
 using OrderManagementSystem.Lab.Lab2.AbstractFactory.PayPal;
 using OrderManagementSystem.Lab.Lab2.AbstractFactory.Stripe;
+using OrderManagementSystem.Lab.Lab3.Prototype;
 using OrderManagementSystem.Lab.Lab3.Singleton;
 using OrderManagementSystem.Repositories;
 using OrderManagementSystem.Services;
@@ -59,6 +60,7 @@ builder.Services.AddScoped<IPaymentProviderFactory>(serviceProvider =>
 });
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<StatisticsService>();
+builder.Services.AddScoped<OrderTemplateService>();
 
 var secret = builder.Configuration["Jwt:Secret"];
 if (string.IsNullOrWhiteSpace(secret))

@@ -45,6 +45,9 @@ export default function OrdersPage() {
           <Link href="/orders/custom" className="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg">
             Comanda custom
           </Link>
+          <Link href="/orders/templates" className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg">
+            Template-uri
+          </Link>
           <Link href="/checkout" className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg">
             Checkout
           </Link>

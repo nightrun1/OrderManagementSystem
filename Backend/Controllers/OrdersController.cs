@@ -5,6 +5,7 @@ using OrderManagementSystem.DTOs.Orders;
 using OrderManagementSystem.Interfaces;
 using OrderManagementSystem.Lab.Lab2.FactoryMethod;
 using OrderManagementSystem.Lab.Lab3.Builder;
+using OrderManagementSystem.Lab.Lab3.Prototype;
 using OrderManagementSystem.Models;
 
 namespace OrderManagementSystem.Controllers;
@@ -14,7 +15,8 @@ namespace OrderManagementSystem.Controllers;
 [Authorize]
 public class OrdersController(
     IOrderRepository orderRepository,
-    IProductRepository productRepository) : ControllerBase
+    IProductRepository productRepository,
+    OrderTemplateService orderTemplateService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IEnumerable<OrderDto>>> GetMyOrders()
@@ -214,6 +216,92 @@ public class OrdersController(
         }
     }
 
+    [HttpPost("{id:int}/save-as-template")]
+    public async Task<ActionResult<OrderTemplateDto>> SaveAsTemplate(int id, SaveOrderTemplateRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest(new { message = "Template name is required." });
+        }
+
+        var order = await orderRepository.GetWithItemsAsync(id);
+        if (order is null)
+        {
+            return NotFound(new { message = "Order was not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        var isAdmin = User.IsInRole(UserRole.Admin.ToString());
+
+        if (!isAdmin && order.UserId != currentUserId)
+        {
+            return StatusCode(403, new { message = "You do not have access to this order." });
+        }
+
+        try
+        {
+            var template = await orderTemplateService.CreateTemplateFromOrderAsync(id, request.Name);
+            await orderTemplateService.SaveTemplateAsync(template);
+            return Ok(MapTemplateDto(template));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("templates")]
+    public async Task<ActionResult<IEnumerable<OrderTemplateDto>>> GetTemplates()
+    {
+        var currentUserId = GetCurrentUserId();
+        var templates = await orderTemplateService.GetUserTemplatesAsync(currentUserId);
+
+        return Ok(templates.Select(MapTemplateDto).ToList());
+    }
+
+    [HttpPost("templates/{id:int}/clone")]
+    public async Task<ActionResult<OrderDto>> CloneTemplate(int id)
+    {
+        var template = await orderTemplateService.GetTemplateAsync(id);
+        if (template is null)
+        {
+            return NotFound(new { message = "Template was not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        var isAdmin = User.IsInRole(UserRole.Admin.ToString());
+
+        if (!isAdmin && template.CreatedByUserId != currentUserId)
+        {
+            return StatusCode(403, new { message = "You do not have access to this template." });
+        }
+
+        try
+        {
+            var clonedOrder = await orderTemplateService.CloneAsNewOrderAsync(id);
+            return Ok(MapToDto(clonedOrder, "TemplateClone", 0m));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("templates/{id:int}")]
+    public async Task<IActionResult> DeleteTemplate(int id)
+    {
+        var currentUserId = GetCurrentUserId();
+        var isAdmin = User.IsInRole(UserRole.Admin.ToString());
+
+        var deleted = await orderTemplateService.DeleteTemplateAsync(id, isAdmin ? null : currentUserId);
+        if (!deleted)
+        {
+            return NotFound(new { message = "Template was not found." });
+        }
+
+        return NoContent();
+    }
+
     private int GetCurrentUserId()
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -272,6 +360,20 @@ public class OrdersController(
         }
 
         return director.BuildQuickOrder(userId, firstItem.ProductId, firstItem.Quantity, request.ShippingAddress);
+    }
+
+    private static OrderTemplateDto MapTemplateDto(OrderTemplate template)
+    {
+        return new OrderTemplateDto(
+            template.Id,
+            template.Name,
+            template.CreatedByUserId,
+            template.ShippingAddress,
+            template.CreatedAt,
+            template.Items.Count,
+            template.Items
+                .Select(item => new OrderItemSnapshotDto(item.ProductId, item.ProductName, item.Quantity, item.UnitPrice))
+                .ToList());
     }
 
     private static OrderDto MapToDto(Order order, string orderType = "Standard", decimal shippingCost = 15m)
