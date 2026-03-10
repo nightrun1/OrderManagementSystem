@@ -42,6 +42,9 @@ export default function OrdersPage() {
           <Link href="/orders/new" className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg">
             Comanda noua
           </Link>
+          <Link href="/orders/custom" className="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg">
+            Comanda custom
+          </Link>
           <Link href="/checkout" className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg">
             Checkout
           </Link>

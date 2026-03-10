@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using OrderManagementSystem.DTOs.Orders;
 using OrderManagementSystem.Interfaces;
 using OrderManagementSystem.Lab.Lab2.FactoryMethod;
+using OrderManagementSystem.Lab.Lab3.Builder;
 using OrderManagementSystem.Models;
 
 namespace OrderManagementSystem.Controllers;
@@ -127,10 +128,150 @@ public class OrdersController(
         return Ok(MapToDto(savedOrder, creationResult.Order.OrderType, creationResult.ShippingCost));
     }
 
+    [HttpPost("custom")]
+    public async Task<ActionResult<CustomOrderResultDto>> CreateCustom(CreateCustomOrderRequest request)
+    {
+        if (request.Items.Count == 0)
+        {
+            return BadRequest(new { message = "Order must contain at least one item." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        var isAdmin = User.IsInRole(UserRole.Admin.ToString());
+        var targetUserId = isAdmin ? request.UserId : currentUserId;
+
+        var builder = new CustomOrderBuilder(productRepository);
+        CustomOrderDto customOrder;
+
+        try
+        {
+            if (request.UseDirectorPreset)
+            {
+                var preset = request.PresetType?.Trim().ToLowerInvariant();
+                var director = new OrderDirector(builder);
+
+                customOrder = preset switch
+                {
+                    "quick" => BuildQuickPreset(director, targetUserId, request),
+                    "priority" => director.BuildPriorityOrder(targetUserId, request.Items, request.ShippingAddress),
+                    _ => throw new InvalidOperationException("PresetType must be quick or priority.")
+                };
+            }
+            else
+            {
+                var fluentBuilder = builder
+                    .ForUser(targetUserId)
+                    .ShipTo(request.ShippingAddress)
+                    .WithDeliveryOption(request.DeliveryOption);
+
+                foreach (var item in request.Items)
+                {
+                    fluentBuilder.AddItem(item.ProductId, item.Quantity);
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.DiscountCode))
+                {
+                    fluentBuilder.WithDiscountCode(request.DiscountCode);
+                }
+
+                if (request.IsPriority)
+                {
+                    fluentBuilder.AsPriority();
+                }
+
+                if (!string.IsNullOrWhiteSpace(request.Note))
+                {
+                    fluentBuilder.WithNote(request.Note);
+                }
+
+                customOrder = fluentBuilder.Build();
+            }
+
+            var savedOrder = await SaveCustomOrderAsync(customOrder);
+
+            return Ok(new CustomOrderResultDto(
+                savedOrder.Id,
+                savedOrder.Status,
+                customOrder.FinalTotal,
+                customOrder.ShippingCost,
+                customOrder.DiscountAmount,
+                customOrder.DeliveryOption,
+                customOrder.IsPriority,
+                customOrder.ShippingAddress,
+                savedOrder.CreatedAt,
+                savedOrder.Items
+                    .Select(item => new OrderItemDto(item.ProductId, item.Product.Name, item.Quantity, item.UnitPrice))
+                    .ToList(),
+                customOrder.CustomerNote));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     private int GetCurrentUserId()
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return int.TryParse(userIdValue, out var userId) ? userId : 0;
+    }
+
+    private async Task<Order> SaveCustomOrderAsync(CustomOrderDto customOrder)
+    {
+        var orderItems = new List<OrderItem>();
+
+        foreach (var item in customOrder.Items)
+        {
+            var product = await productRepository.GetByIdAsync(item.ProductId);
+            if (product is null || !product.IsActive)
+            {
+                throw new KeyNotFoundException($"Product {item.ProductId} was not found.");
+            }
+
+            if (product.Stock < item.Quantity)
+            {
+                throw new InvalidOperationException($"Insufficient stock for product {item.ProductId}.");
+            }
+
+            product.Stock -= item.Quantity;
+            await productRepository.UpdateAsync(product);
+
+            orderItems.Add(new OrderItem
+            {
+                ProductId = product.Id,
+                Quantity = item.Quantity,
+                UnitPrice = product.Price
+            });
+        }
+
+        var order = new Order
+        {
+            UserId = customOrder.UserId,
+            ShippingAddress = customOrder.ShippingAddress,
+            Status = OrderStatus.Pending,
+            TotalAmount = customOrder.FinalTotal,
+            Items = orderItems
+        };
+
+        await orderRepository.AddAsync(order);
+
+        return await orderRepository.GetWithItemsAsync(order.Id)
+            ?? throw new InvalidOperationException("Order could not be loaded after creation.");
+    }
+
+    private static CustomOrderDto BuildQuickPreset(OrderDirector director, int userId, CreateCustomOrderRequest request)
+    {
+        var firstItem = request.Items.FirstOrDefault();
+        if (firstItem is null)
+        {
+            throw new InvalidOperationException("Quick preset requires at least one item.");
+        }
+
+        return director.BuildQuickOrder(userId, firstItem.ProductId, firstItem.Quantity, request.ShippingAddress);
     }
 
     private static OrderDto MapToDto(Order order, string orderType = "Standard", decimal shippingCost = 15m)
