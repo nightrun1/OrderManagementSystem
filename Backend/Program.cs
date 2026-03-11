@@ -10,6 +10,9 @@ using OrderManagementSystem.Lab.Lab2.AbstractFactory.PayPal;
 using OrderManagementSystem.Lab.Lab2.AbstractFactory.Stripe;
 using OrderManagementSystem.Lab.Lab3.Prototype;
 using OrderManagementSystem.Lab.Lab3.Singleton;
+using OrderManagementSystem.Lab.Lab4.Adapter;
+using OrderManagementSystem.Lab.Lab4.Adapter.DPD;
+using OrderManagementSystem.Lab.Lab4.Adapter.FanCourier;
 using OrderManagementSystem.Repositories;
 using OrderManagementSystem.Services;
 
@@ -61,6 +64,13 @@ builder.Services.AddScoped<IPaymentProviderFactory>(serviceProvider =>
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<StatisticsService>();
 builder.Services.AddScoped<OrderTemplateService>();
+
+// Lab4 — Adapter (Shipping)
+builder.Services.AddSingleton<FanCourierClient>();
+builder.Services.AddSingleton<DpdApiClient>();
+builder.Services.AddScoped<IShippingProvider, FanCourierAdapter>();
+builder.Services.AddScoped<IShippingProvider, DpdAdapter>();
+builder.Services.AddScoped<ShippingService>();
 
 var secret = builder.Configuration["Jwt:Secret"];
 if (string.IsNullOrWhiteSpace(secret))
