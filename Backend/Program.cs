@@ -13,6 +13,7 @@ using OrderManagementSystem.Lab.Lab3.Singleton;
 using OrderManagementSystem.Lab.Lab4.Adapter;
 using OrderManagementSystem.Lab.Lab4.Adapter.DPD;
 using OrderManagementSystem.Lab.Lab4.Adapter.FanCourier;
+using OrderManagementSystem.Lab.Lab4.Facade;
 using OrderManagementSystem.Repositories;
 using OrderManagementSystem.Services;
 
@@ -71,6 +72,10 @@ builder.Services.AddSingleton<DpdApiClient>();
 builder.Services.AddScoped<IShippingProvider, FanCourierAdapter>();
 builder.Services.AddScoped<IShippingProvider, DpdAdapter>();
 builder.Services.AddScoped<ShippingService>();
+
+// Lab4 — Facade (Checkout)
+builder.Services.AddScoped<IEmailNotificationService, ConsoleEmailNotificationService>();
+builder.Services.AddScoped<OrderPlacementFacade>();
 
 var secret = builder.Configuration["Jwt:Secret"];
 if (string.IsNullOrWhiteSpace(secret))
