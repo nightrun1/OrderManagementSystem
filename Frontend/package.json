@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
-    "dev:backend": "lsof -ti:5248 | xargs kill -15 2>/dev/null || true; cd .. && docker compose up -d sqlserver && cd Backend && dotnet run",
+    "dev:backend": "lsof -ti:5248 | xargs kill -15 2>/dev/null || true; cd ../Backend && dotnet run",
     "dev:frontend": "lsof -ti:3000 | xargs kill -15 2>/dev/null || true; next dev --port 3000",
     "db:up": "cd .. && docker compose up -d sqlserver",
     "db:down": "cd .. && docker compose down",
